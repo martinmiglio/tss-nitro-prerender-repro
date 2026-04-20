@@ -4,36 +4,29 @@ on:
   push:
   workflow_dispatch:
 
+# Each job runs `bun run build` with a different nitro preset.
+# A red job = the bug reproduces (build errors out or hangs past the timeout).
+# A green job = the build completes normally.
+# When TanStack/nitro ship a fix, the red jobs flip to green.
 jobs:
   matrix:
-    name: ${{ matrix.preset }}
+    name: ${{ matrix.label }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
         include:
-          - preset: default (node-server)
-            env: ''
-            expect: success
-          - preset: node-server
-            env: node-server
-            expect: success
-          - preset: aws-lambda
-            env: aws-lambda
-            expect: failure
-          - preset: vercel
-            env: vercel
-            expect: failure
-          - preset: netlify
-            env: netlify
-            expect: failure
-          - preset: cloudflare
-            env: cloudflare
-            expect: failure
-          - preset: static
-            env: static
-            expect: failure
+          - label: default (node-server)
+            preset: ''
+          - label: node-server
+            preset: node-server
+          - label: aws-lambda
+            preset: aws-lambda
+          - label: vercel
+            preset: vercel
+          - label: netlify
+            preset: netlify
     steps:
       - uses: actions/checkout@v4
 
@@ -49,33 +42,14 @@ jobs:
           node --version
           bun --version
 
-      - name: Build with preset=${{ matrix.preset }}
-        id: build
-        continue-on-error: true
+      - name: Build (preset=${{ matrix.label }})
         env:
-          NITRO_PRESET: ${{ matrix.env }}
+          NITRO_PRESET: ${{ matrix.preset }}
         timeout-minutes: 2
         run: bun run build 2>&1 | tee build.log
-
-      - name: Assert expected outcome
-        run: |
-          if [ "${{ matrix.expect }}" = "success" ]; then
-            if [ "${{ steps.build.outcome }}" = "success" ]; then
-              echo "OK: build succeeded as expected for preset ${{ matrix.preset }}"
-              exit 0
-            fi
-            echo "FAIL: expected success but build errored"
-            exit 1
-          fi
-          if grep -qE "Failed to fetch|Cannot find module .*dist/server/server.js|Prerendered 0 pages|error: script \"build\" exited with code 1" build.log; then
-            echo "OK: reproduced expected failure for preset ${{ matrix.preset }}"
-            exit 0
-          fi
-          echo "FAIL: expected failure mode not observed"
-          exit 1
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build-log-${{ matrix.env || 'default' }}
+          name: build-log-${{ matrix.preset || 'default' }}
           path: build.log
