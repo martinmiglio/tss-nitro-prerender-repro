@@ -5,3 +5,9 @@ dist
 src/routeTree.gen.ts
 *.log
 .DS_Store
+
+# Local-only
+docs/
+.claude/
+.vercel/
+.netlify/
