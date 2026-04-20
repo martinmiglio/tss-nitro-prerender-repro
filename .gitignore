@@ -1,0 +1,7 @@
+node_modules
+dist
+.nitro
+.output
+src/routeTree.gen.ts
+*.log
+.DS_Store

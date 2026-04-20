@@ -1,0 +1,44 @@
+name: Repro
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Reproduce prerender ERR_MODULE_NOT_FOUND
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Print versions
+        run: |
+          bun pm ls | grep -E 'tanstack|nitro|vite|@vitejs' || true
+          node --version
+          bun --version
+
+      - name: Build (expected to fail with ERR_MODULE_NOT_FOUND)
+        id: build
+        continue-on-error: true
+        run: bun run build 2>&1 | tee build.log
+
+      - name: Assert failure mode
+        run: |
+          if grep -q "Cannot find module .*dist/server/server.js" build.log; then
+            echo "OK: reproduced ERR_MODULE_NOT_FOUND on dist/server/server.js"
+            exit 0
+          fi
+          echo "FAIL: did not see the expected error"
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: build.log
