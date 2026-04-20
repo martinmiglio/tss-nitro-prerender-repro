@@ -5,9 +5,35 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Reproduce prerender ERR_MODULE_NOT_FOUND
+  matrix:
+    name: ${{ matrix.preset }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: default (node-server)
+            env: ''
+            expect: success
+          - preset: node-server
+            env: node-server
+            expect: success
+          - preset: aws-lambda
+            env: aws-lambda
+            expect: failure
+          - preset: vercel
+            env: vercel
+            expect: failure
+          - preset: netlify
+            env: netlify
+            expect: failure
+          - preset: cloudflare
+            env: cloudflare
+            expect: failure
+          - preset: static
+            env: static
+            expect: failure
     steps:
       - uses: actions/checkout@v4
 
@@ -23,22 +49,33 @@ jobs:
           node --version
           bun --version
 
-      - name: Build (expected to fail with ERR_MODULE_NOT_FOUND)
+      - name: Build with preset=${{ matrix.preset }}
         id: build
         continue-on-error: true
+        env:
+          NITRO_PRESET: ${{ matrix.env }}
+        timeout-minutes: 2
         run: bun run build 2>&1 | tee build.log
 
-      - name: Assert failure mode
+      - name: Assert expected outcome
         run: |
-          if grep -q "Cannot find module .*dist/server/server.js" build.log; then
-            echo "OK: reproduced ERR_MODULE_NOT_FOUND on dist/server/server.js"
+          if [ "${{ matrix.expect }}" = "success" ]; then
+            if [ "${{ steps.build.outcome }}" = "success" ]; then
+              echo "OK: build succeeded as expected for preset ${{ matrix.preset }}"
+              exit 0
+            fi
+            echo "FAIL: expected success but build errored"
+            exit 1
+          fi
+          if grep -qE "Failed to fetch|Cannot find module .*dist/server/server.js|Prerendered 0 pages|error: script \"build\" exited with code 1" build.log; then
+            echo "OK: reproduced expected failure for preset ${{ matrix.preset }}"
             exit 0
           fi
-          echo "FAIL: did not see the expected error"
+          echo "FAIL: expected failure mode not observed"
           exit 1
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build-log
+          name: build-log-${{ matrix.env || 'default' }}
           path: build.log

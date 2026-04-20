@@ -3,13 +3,12 @@ import viteReact from '@vitejs/plugin-react'
 import { nitro } from 'nitro/vite'
 import { defineConfig } from 'vite'
 
+const preset = process.env.NITRO_PRESET
+
 export default defineConfig({
   plugins: [
-    nitro({ preset: 'aws-lambda' }),
-    tanstackStart({
-      customViteReactPlugin: true,
-      prerender: { enabled: true, autoSubfolderIndex: true, crawlLinks: true }
-    }),
-    viteReact()
+    tanstackStart({ prerender: { enabled: true, crawlLinks: true } }),
+    viteReact(),
+    nitro(preset ? { preset } : {})
   ]
 })
